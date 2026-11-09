@@ -16,9 +16,21 @@ on:
         description: "Production rollout fraction (0.05 = 5%, 1 = everyone)"
         default: "0.1"
 
+# Least privilege: the job only needs to read the code. Secrets are the Play upload key and service account.
+permissions:
+  contents: read
+
+# Never run two releases at once.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Production releases wait for the "production" environment. In GitHub: Settings, Environments, production,
+    # tick "Required reviewers" and add yourself, so nothing reaches users without your explicit approval.
+    environment: ${{ github.event.inputs.track == 'production' && 'production' || 'testing' }}
     steps:
       - uses: actions/checkout@v4
 

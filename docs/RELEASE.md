@@ -39,17 +39,20 @@ Back up `upload.jks` and its passwords somewhere safe (password manager plus an 
 | `KEY_PASSWORD` | key password |
 | `PLAY_SERVICE_ACCOUNT_JSON` | the full contents of the service account JSON |
 
-### 7. Host the privacy policy and launch switch (GitHub Pages)
+### 7. Protect production releases (GitHub environment)
+In the repo: Settings, Environments, **New environment**, name it `production`, tick **Required reviewers** and add yourself. From then on, a production release waits for your click before it can use the signing key and service account. Also create an environment named `testing` (no reviewers) for internal and closed-test uploads. Turn on 2FA for GitHub, Google Play and Google Cloud, and only let people you trust push tags.
+
+### 8. Host the privacy policy and launch settings (GitHub Pages)
 1. Edit `docs/privacy.html` (date and email).
 2. Repo Settings, Pages, deploy from branch `main`, folder `/docs`.
 3. Your URLs become `https://YOURNAME.github.io/REPO/privacy.html` and `.../config.json`.
 4. Put them in `RemoteFlags.CONFIG_URL` and `RemoteFlags.PRIVACY_URL` in `Monetization.kt`. Use the same privacy URL in the Play Console.
 
-### 8. Replace the test ad ids
+### 9. Replace the test ad ids
 In `Ads.kt` and `AndroidManifest.xml`, replace Google's test ad ids with your AdMob app id and banner unit id. Do this before launch, never click your own live ads.
 
-### 9. Local tooling
-Install Android Studio (JDK 17 and the Android SDK, including platform 36). Open the project and let Gradle sync. Generate the wrapper once with `gradle wrapper --gradle-version 8.11.1` (or use Studio's sync) and commit `gradlew`, `gradlew.bat` and `gradle/wrapper/gradle-wrapper.jar`. Install Git and push the project to your GitHub repo.
+### 10. Local tooling
+Android Studio, JDK 17 and Git are the tools you need. The Gradle wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar`) is already committed. To build from a terminal: `gradlew :app:assembleDebug` (test APK) or `gradlew :app:bundleRelease` (Play bundle, signed when the `KEYSTORE_*` environment variables from section A.6 are set).
 
 ## B. The release cycle
 
