@@ -9,13 +9,13 @@ Everything here is a one-time setup, then a repeatable cycle. I couldn't run any
 2. GitHub account and an empty repository (private is fine).
 3. Google AdMob account, for ads (used only after the launch period).
 
-### 2. Pick your permanent app id
-`applicationId` in `app/build.gradle.kts` is `com.focuslock.app`. Change it to one you own (for example `com.yourname.focuslock`) **before the first upload**. It can never change afterwards. Also update `packageName` in `.github/workflows/release.yml`.
+### 2. Permanent app id
+`applicationId` in `app/build.gradle.kts` and `packageName` in `.github/workflows/release.yml` are set to `com.dwit.focuslock`.
 
 ### 3. Create the upload key (run once, keep it safe)
-Install a JDK (Android Studio includes one), then:
+Using the installed JDK 17 (`E:\Dev\Tools\jdk-17.0.21+9\bin\keytool.exe`):
 ```
-keytool -genkeypair -v -keystore upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+E:\Dev\Tools\jdk-17.0.21+9\bin\keytool.exe -genkeypair -v -keystore E:\Dev\upload.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
 ```
 Back up `upload.jks` and its passwords somewhere safe (password manager plus an offline copy). Enrol in **Play App Signing** when you create the app. Then Google holds the real signing key, and if you ever lose the upload key you can ask Google to reset it. Never commit the key (`.gitignore` already blocks it).
 
@@ -43,10 +43,9 @@ Back up `upload.jks` and its passwords somewhere safe (password manager plus an 
 In the repo: Settings, Environments, **New environment**, name it `production`, tick **Required reviewers** and add yourself. From then on, a production release waits for your click before it can use the signing key and service account. Also create an environment named `testing` (no reviewers) for internal and closed-test uploads. Turn on 2FA for GitHub, Google Play and Google Cloud, and only let people you trust push tags.
 
 ### 8. Host the privacy policy and launch settings (GitHub Pages)
-1. Edit `docs/privacy.html` (date and email).
-2. Repo Settings, Pages, deploy from branch `main`, folder `/docs`.
-3. Your URLs become `https://YOURNAME.github.io/REPO/privacy.html` and `.../config.json`.
-4. Put them in `RemoteFlags.CONFIG_URL` and `RemoteFlags.PRIVACY_URL` in `Monetization.kt`. Use the same privacy URL in the Play Console.
+1. `docs/privacy.html` is already configured with `dreamweaveritteam@gmail.com`.
+2. In `https://github.com/nhosen36/focuslock`, open **Settings → Pages**, and deploy from branch `main`, folder `/docs`.
+3. Your live URLs will be `https://nhosen36.github.io/focuslock/privacy.html` and `https://nhosen36.github.io/focuslock/config.json` (already wired into `RemoteFlags` in `Monetization.kt`). Use `https://nhosen36.github.io/focuslock/privacy.html` in Google Play Console.
 
 ### 9. Replace the test ad ids
 In `Ads.kt` and `AndroidManifest.xml`, replace Google's test ad ids with your AdMob app id and banner unit id. Do this before launch, never click your own live ads.

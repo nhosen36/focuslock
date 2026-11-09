@@ -86,11 +86,11 @@ Because ads are off during the launch phase, you can keep the AdMob entries from
 4. Staged rollout for Production (10%, then 50%, then 100%).
 
 ## 7. Pre-submission checks
-- [ ] `applicationId` changed to your own, and it matches `release.yml`.
+- [x] `applicationId` set to `com.dwit.focuslock`, matching `release.yml`.
 - [ ] Test AdMob ids replaced, ad units created.
-- [ ] `RemoteFlags` URLs set. Privacy policy has your date and email.
+- [x] `RemoteFlags` URLs set to `https://nhosen36.github.io/focuslock/...`. Privacy policy updated with date and `dreamweaveritteam@gmail.com`.
 - [ ] Audio files in `assets/music/` all have a licence record.
 - [ ] App tested on Android 8 to 16, including a Samsung, a Xiaomi and an Oppo or Vivo phone.
-- [ ] Target API 36, Billing Library 8 or higher.
+- [x] Target API 36, Billing Library 8 or higher.
 - [ ] Emergency call button works on a real SIM.
 - [ ] Review the pre-launch report in Play Console and fix crashes.

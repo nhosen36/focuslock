@@ -13,7 +13,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.focuslock.app" // change to your own id BEFORE the first upload; it can never change after
+        applicationId = "com.dwit.focuslock"
         minSdk = 26
         targetSdk = 36 // Google Play requires API 36 for new apps and updates from Aug 31, 2026
         versionCode = appVersionCode

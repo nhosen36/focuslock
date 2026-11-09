@@ -73,7 +73,7 @@ jobs:
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.focuslock.app
+          packageName: com.dwit.focuslock
           releaseFiles: app/build/outputs/bundle/release/app-release.aab
           track: ${{ github.event.inputs.track || 'internal' }}
           userFraction: ${{ github.event.inputs.track == 'production' && github.event.inputs.rollout || '' }}

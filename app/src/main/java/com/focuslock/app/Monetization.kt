@@ -28,9 +28,9 @@ object Services {
  *  - free_minutes_per_month: the free allowance. Change it any time without an app update.
  */
 object RemoteFlags {
-    // Host docs/config.json (for example with GitHub Pages) and put its URL here.
-    const val CONFIG_URL = "https://YOUR_GITHUB_USER.github.io/focuslock/config.json"
-    const val PRIVACY_URL = "https://YOUR_GITHUB_USER.github.io/focuslock/privacy.html"
+    // Hosted via GitHub Pages from docs/ on branch main.
+    const val CONFIG_URL = "https://nhosen36.github.io/focuslock/config.json"
+    const val PRIVACY_URL = "https://nhosen36.github.io/focuslock/privacy.html"
 
     // Safe defaults if the file can't be reached: the normal free plan applies.
     var monetization by mutableStateOf(true); private set
