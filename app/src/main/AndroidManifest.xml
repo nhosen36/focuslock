@@ -31,7 +31,12 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="FocusLock"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@style/Theme.FocusLock">
+
+        <!-- The Ads SDK must not start by itself. We start it only after the consent step, and only for free users. -->
+        <provider
+            android:name="com.google.android.gms.ads.MobileAdsInitProvider"
+            tools:node="remove" />
 
         <!-- Google's public TEST app ID. Replace with your AdMob app ID before release. -->
         <meta-data
