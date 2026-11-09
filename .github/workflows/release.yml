@@ -1,0 +1,70 @@
+name: Release to Google Play
+
+# Push a tag like v1.0.3  -> builds a signed bundle and uploads it to the INTERNAL testing track.
+# Or run it manually (Actions tab) to choose another track and a staged-rollout percentage.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play track"
+        type: choice
+        default: internal
+        options: [internal, alpha, beta, production]
+      rollout:
+        description: "Production rollout fraction (0.05 = 5%, 1 = everyone)"
+        default: "0.1"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+
+      - name: Work out version
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then NAME="${GITHUB_REF#refs/tags/v}"; else NAME="$(cat VERSION)"; fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Restore upload keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build signed app bundle
+        env:
+          KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        # versionCode must grow with every upload; the run number always does.
+        run: gradle :app:bundleRelease -PversionCode=${{ github.run_number }} -PversionName=${{ steps.ver.outputs.name }}
+
+      - name: Keep the bundle and the R8 mapping file
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.ver.outputs.name }}
+          path: |
+            app/build/outputs/bundle/release/*.aab
+            app/build/outputs/mapping/release/mapping.txt
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.focuslock.app
+          releaseFiles: app/build/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.track || 'internal' }}
+          userFraction: ${{ github.event.inputs.track == 'production' && github.event.inputs.rollout || '' }}
+          status: ${{ (github.event.inputs.track == 'production' && github.event.inputs.rollout != '1') && 'inProgress' || 'completed' }}
+          whatsNewDirectory: distribution/whatsnew
+          mappingFile: app/build/outputs/mapping/release/mapping.txt
