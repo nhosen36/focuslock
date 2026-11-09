@@ -69,7 +69,7 @@ Because ads are off during the launch phase, you can keep the AdMob entries from
 >
 > FREE AND PRO: The free plan gives you 120 focus minutes every month, with small ads on the Stats, Awards and Style screens (never during a session). FocusLock Pro is an optional subscription (monthly or yearly) for unlimited focus time and no ads. Cancel any time in Google Play.
 
-- **Graphics:** ready in `docs/store/`: `icon-512.png` (512x512) and `feature-graphic-1024x500.png`. Phone screenshots are in `docs/store/screenshots/` (taken from the real app on an emulator). Play needs at least 2 phone screenshots.
+- **Graphics:** ready in `docs/store/`: `icon-512.png` (512x512) and `feature-graphic-1024x500.png`. **Phone screenshots are still to do:** take at least 2 (ideally 4: Focus, a running session, Stats, Awards) on a real phone or a working emulator, in the app's dark style. Play needs at least 2.
 - **Category:** Productivity. **Contact email** and **website** (your Pages URL) required.
 
 ## 5. Subscription product
