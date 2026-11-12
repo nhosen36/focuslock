@@ -473,42 +473,73 @@ private fun StartScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Top Greeting Header
-        Row(
+        Column(
             Modifier.fillMaxWidth().padding(top = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                calmGreeting().uppercase(),
+                color = Accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.4.sp
+            )
+            Text(
+                "Find your focus.",
+                fontFamily = SerifFont,
+                fontSize = 26.sp,
+                color = Fg
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Aligned Streak & Breathing Quick-Action Row
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(calmGreeting().uppercase(), color = Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp)
-                Text("Find your focus.", fontFamily = SerifFont, fontSize = 26.sp, color = Fg)
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(GlassSurface)
+                    .border(1.dp, Accent.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(GlassSurface)
-                        .border(1.dp, GlassBorder, RoundedCornerShape(20.dp))
-                        .clickable { onOpenBreathing() }
-                        .padding(horizontal = 11.dp, vertical = 6.dp)
-                ) {
-                    Text("◯  Breathe", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Box(
-                    Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(GlassSurface)
-                        .border(1.dp, Accent.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                        .padding(horizontal = 11.dp, vertical = 6.dp)
-                ) {
-                    Text("✦  ${streakDays}d  •  ${totalHrs}h", color = Fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                }
+                Text(
+                    "✦  $streakDays day streak  •  ${totalHrs}h",
+                    color = Fg,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(GlassSurface)
+                    .border(1.dp, Accent.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    .clickable { onOpenBreathing() }
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "◯  Breathing Exercise",
+                    color = Accent,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
             }
         }
 
-        Spacer(Modifier.height(22.dp))
+        Spacer(Modifier.height(18.dp))
 
         // Breathing Halo Timer Dial
         val curAccent = Accent

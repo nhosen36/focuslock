@@ -71,28 +71,23 @@ fun StatsScreen(stats: StatsStore) {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Header + Share Pill
-        Row(
+        // Editorial Header
+        Column(
             Modifier.fillMaxWidth().padding(top = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.Start
         ) {
-            Column {
-                Text("MINDFUL ANALYTICS", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp)
-                Text("Your Focus Journey", fontFamily = SerifFont, fontSize = 26.sp, color = Fg)
-            }
-            SecondaryPillButton(
-                text = "↗  Share Card",
-                textColor = Accent,
-                borderColor = Accent.copy(alpha = 0.4f),
-                onClick = {
-                    ShareCard.share(
-                        ctx,
-                        if (monthly) "My Month in Focus" else "My Week in Focus",
-                        fmtMinutes(total),
-                        "$sessions sessions  •  $active active days  •  ${stats.streak()}-day streak"
-                    )
-                }
+            Text(
+                "MINDFUL ANALYTICS",
+                color = Accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.4.sp
+            )
+            Text(
+                "Your Focus Journey",
+                fontFamily = SerifFont,
+                fontSize = 26.sp,
+                color = Fg
             )
         }
 
@@ -126,7 +121,7 @@ fun StatsScreen(stats: StatsStore) {
             }
         }
 
-        // Hero Total Time + Bento Grid
+        // Hero Total Time + Integrated Share Action
         GlassCard(
             modifier = Modifier.fillMaxWidth(),
             cornerRadius = 24.dp,
@@ -138,30 +133,103 @@ fun StatsScreen(stats: StatsStore) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(
                         fmtMinutes(total),
-                        fontSize = 46.sp,
+                        fontSize = 44.sp,
                         fontWeight = FontWeight.Light,
-                        color = Fg
+                        color = Fg,
+                        maxLines = 1
                     )
                     Text(
                         if (monthly) "Focused in the last 30 days" else "Focused in the last 7 days",
                         color = Muted,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        maxLines = 1
                     )
                 }
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(16.dp))
                         .background(Accent.copy(alpha = 0.16f))
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .border(1.dp, Accent.copy(alpha = 0.35f), RoundedCornerShape(16.dp))
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
                 ) {
                     Text(
                         "$active/${days.size} active days",
                         color = Accent,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Line))
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .border(1.dp, GlassBorder, RoundedCornerShape(16.dp))
+                    .clickable {
+                        ShareCard.share(
+                            ctx,
+                            if (monthly) "My Month in Focus" else "My Week in Focus",
+                            fmtMinutes(total),
+                            "$sessions sessions  •  $active active days  •  ${stats.streak()}-day streak"
+                        )
+                    }
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Accent.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("✦", color = Accent, fontSize = 14.sp)
+                    }
+                    Column {
+                        Text(
+                            "Share Focus Story Card",
+                            color = Fg,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                        Text(
+                            "Export your ${if (monthly) "30-day" else "7-day"} progress image",
+                            color = Muted,
+                            fontSize = 11.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Accent.copy(alpha = 0.2f))
+                        .border(1.dp, Accent.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        "Share ↗",
+                        color = Accent,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
                 }
             }
