@@ -36,12 +36,12 @@ fun Onboarding(onDone: () -> Unit) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Spacer(Modifier.height(24.dp))
             Text("FocusLock", fontSize = 36.sp, fontWeight = FontWeight.Light)
-            Text("Turn your phone into a calls-only screen while you work, so notifications and scrolling can't pull you away.")
-            Text("To do this, FocusLock will ask for two things, only when you set it up:", color = Muted)
-            Text("1. Home app. FocusLock becomes your Home screen so only Phone, Contacts and Emergency are shown during a session. You can switch back any time in Settings.")
-            Text("2. Do Not Disturb access. This silences notifications during a session and restores your setting afterwards.")
+            Text("Lock in and study without notifications or app-switching pulling you away.")
+            Text("How FocusLock protects your focus:", color = Muted)
+            Text("1. Do Not Disturb access. Silences all notification popups and alerts during a session while keeping your study music active, then restores your setting afterwards.")
+            Text("2. Screen Pinning. Pins FocusLock on screen during your session so the Home button, Recents switcher and notification shade are locked until the timer finishes (or you solve 5 math challenges).")
             Text("What we don't do", color = Muted)
-            Text("We don't read your messages, screen, contacts or location. You can always end a session and always call emergency services. Your focus history stays on your phone.")
+            Text("We don't replace your phone's launcher, and we never read your messages, screen, contacts or location. You can always end a session early by solving the math challenge or call emergency services.")
             Text(
                 if (RemoteFlags.monetization)
                     "Free plan: ${RemoteFlags.freeMinutes} focus minutes every month, with small ads on the Stats, Awards and Style screens (never during a session). FocusLock Pro is an optional monthly or yearly subscription for unlimited focus time and no ads. You can cancel any time in Google Play."

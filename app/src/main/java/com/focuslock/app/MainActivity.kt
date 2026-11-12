@@ -5,20 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -75,7 +70,6 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (::store.isInitialized) {
-            store.allowingDialerExit = false
             if (store.isActive) {
                 store.enforceIfActive()
                 setImmersiveSessionMode(true)
@@ -90,31 +84,6 @@ class MainActivity : ComponentActivity() {
         if (hasFocus && ::store.isInitialized && store.isActive) {
             setImmersiveSessionMode(true)
             store.enforceIfActive()
-        }
-    }
-
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        bringBackIfLocked()
-    }
-
-    override fun onStop() {
-        super.onStop()
-        bringBackIfLocked()
-    }
-
-    private fun bringBackIfLocked() {
-        if (::store.isInitialized && store.isActive && !store.allowingDialerExit) {
-            val i = Intent(this, MainActivity::class.java).apply {
-                addFlags(
-                    Intent.FLAG_ACTIVITY_NEW_TASK or
-                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
-                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-                )
-            }
-            try {
-                startActivity(i)
-            } catch (_: Exception) {}
         }
     }
 
@@ -206,7 +175,7 @@ private fun App(store: SessionStore) {
             showPaywall -> Paywall(outOfMinutes = paywallOut, onClose = { showPaywall = false })
             else -> Column {
                 Row {
-                    listOf("Focus", "Stats", "Awards", "Apps", "Style").forEachIndexed { i, t ->
+                    listOf("Focus", "Stats", "Awards", "Style").forEachIndexed { i, t ->
                         Link(t, color = if (tab == i) Fg else Muted, size = 14) { tab = i }
                     }
                 }
@@ -225,12 +194,11 @@ private fun App(store: SessionStore) {
                         )
                         1 -> StatsScreen(store.stats)
                         2 -> AwardsScreen(store.stats)
-                        3 -> AppList()
                         else -> StyleScreen(onPaywall = { paywallOut = false; showPaywall = true })
                     }
                 }
-                // Ads (free users only) appear on Stats, Awards and Style. Never on Focus, Apps or in a session.
-                if (tab == 1 || tab == 2 || tab == 4) AdArea(onUpgrade = { paywallOut = false; showPaywall = true })
+                // Ads (free users only) appear on Stats, Awards and Style. Never on Focus or in a session.
+                if (tab == 1 || tab == 2 || tab == 3) AdArea(onUpgrade = { paywallOut = false; showPaywall = true })
             }
         }
     }
@@ -242,25 +210,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
     val nm = ctx.getSystemService(NotificationManager::class.java)
     var minutes by remember { mutableStateOf(25) }
     var dndOk by remember { mutableStateOf(nm.isNotificationPolicyAccessGranted) }
-    var homeOk by remember { mutableStateOf(HomeRole.isHeld(ctx)) }
     var showSetupGate by remember { mutableStateOf(false) }
-
-    val homeLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val held = HomeRole.isHeld(ctx)
-        homeOk = held
-        if (!held) {
-            // Many OEM phones (Samsung, Honor, Xiaomi, Vivo, Oppo) require picking FocusLock in Default Home Settings.
-            HomeRole.openHomeSettings(ctx)
-        }
-    }
-
-    fun requestHomeRole() {
-        try {
-            homeLauncher.launch(HomeRole.requestIntent(ctx))
-        } catch (_: Exception) {
-            HomeRole.openHomeSettings(ctx)
-        }
-    }
 
     fun requestDndAccess() {
         HomeRole.openDndSettings(ctx)
@@ -269,8 +219,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
     LaunchedEffect(Unit) {
         while (true) {
             dndOk = nm.isNotificationPolicyAccessGranted
-            homeOk = HomeRole.isHeld(ctx)
-            if (dndOk && homeOk && showSetupGate) {
+            if (dndOk && showSetupGate) {
                 showSetupGate = false
             }
             delay(500)
@@ -281,11 +230,11 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
         AlertDialog(
             onDismissRequest = { showSetupGate = false },
             containerColor = Line,
-            title = { Text("Enable Lock Protection First", color = Fg, fontSize = 20.sp) },
+            title = { Text("Enable Notification Blocking", color = Fg, fontSize = 20.sp) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "To block notifications and lock the screen during a session, enable both steps below:",
+                        "Allow Do Not Disturb access for FocusLock so notifications and popups are silenced during your study session (your study music will still play normally):",
                         color = Muted, fontSize = 14.sp
                     )
                     Row(
@@ -296,46 +245,21 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("1. Block Notifications", color = Fg, fontWeight = FontWeight.Medium)
+                            Text("Do Not Disturb Access", color = Fg, fontWeight = FontWeight.Medium)
                             Text(
-                                if (dndOk) "Do Not Disturb access granted" else "Tap to allow FocusLock in Do Not Disturb settings",
+                                if (dndOk) "Granted" else "Tap to switch ON FocusLock in Do Not Disturb access",
                                 color = if (dndOk) Accent else Muted, fontSize = 12.sp
                             )
                         }
                         Text(if (dndOk) "✓ Done" else "Enable ›", color = Accent, fontWeight = FontWeight.Medium)
                     }
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Bg)
-                            .clickable { if (!homeOk) requestHomeRole() }
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text("2. Lock Home Screen", color = Fg, fontWeight = FontWeight.Medium)
-                            Text(
-                                if (homeOk) "FocusLock is set as your Home app" else "Tap and select FocusLock as Default Home app",
-                                color = if (homeOk) Accent else Muted, fontSize = 12.sp
-                            )
-                        }
-                        Text(if (homeOk) "✓ Done" else "Select ›", color = Accent, fontWeight = FontWeight.Medium)
-                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (!dndOk) requestDndAccess()
-                    else if (!homeOk) requestHomeRole()
-                    else showSetupGate = false
+                    if (!dndOk) requestDndAccess() else showSetupGate = false
                 }) {
-                    Text(
-                        when {
-                            !dndOk -> "1. Grant DND Access"
-                            !homeOk -> "2. Set Home App"
-                            else -> "Done"
-                        },
-                        color = Accent
-                    )
+                    Text(if (!dndOk) "Open Settings" else "Done", color = Accent)
                 }
             },
             dismissButton = {
@@ -362,11 +286,10 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
         Spacer(Modifier.height(32.dp))
         val limited = Entitlement.limitsApply()
         val left = if (limited) Entitlement.freeMinutesLeft(store.stats) else Int.MAX_VALUE
-        val readyToLock = dndOk && homeOk
         Box(
             Modifier.size(132.dp).clip(CircleShape).background(Accent)
                 .clickable {
-                    if (!readyToLock) {
+                    if (!dndOk) {
                         showSetupGate = true
                     } else if (limited && left <= 0) {
                         onPaywall()
@@ -378,7 +301,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
             contentAlignment = Alignment.Center
         ) {
             Text(
-                if (readyToLock) "Start" else "Setup\nLock",
+                if (dndOk) "Start" else "Setup\nLock",
                 color = Bg, fontSize = 20.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center
             )
         }
@@ -400,8 +323,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
 
         Spacer(Modifier.weight(1f))
 
-        // Prominent setup card whenever either permission is missing.
-        if (!readyToLock) {
+        if (!dndOk) {
             Column(
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
@@ -410,58 +332,10 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text("Required for Screen & Notification Lock:", color = Fg, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                if (!dndOk) {
-                    Link("1. Allow Do Not Disturb (blocks notifications)  ›", color = Accent, size = 14) {
-                        requestDndAccess()
-                    }
-                } else {
-                    Text("✓ 1. Notification blocking ready", color = Muted, fontSize = 13.sp)
+                Text("One-time setup required:", color = Fg, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Link("Allow Do Not Disturb access (blocks notifications)  ›", color = Accent, size = 14) {
+                    requestDndAccess()
                 }
-                if (!homeOk) {
-                    Link("2. Set FocusLock as Default Home app (locks screen)  ›", color = Accent, size = 14) {
-                        requestHomeRole()
-                    }
-                } else {
-                    Text("✓ 2. Home screen lock ready", color = Muted, fontSize = 13.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AppList() {
-    val ctx = LocalContext.current
-    val isHome = remember { mutableStateOf(HomeRole.isHeld(ctx)) }
-    val apps = remember {
-        val pm = ctx.packageManager
-        val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        pm.queryIntentActivities(q, 0)
-            .filter { it.activityInfo.packageName != ctx.packageName }
-            .map { it.loadLabel(pm).toString() to pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
-            .filter { it.second != null }
-            .sortedBy { it.first.lowercase() }
-    }
-    Column(Modifier.fillMaxSize()) {
-        if (isHome.value) {
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Done studying?", color = Muted, fontSize = 13.sp)
-                Link("Switch back to normal Home launcher ›", color = Accent, size = 13) {
-                    HomeRole.openHomeSettings(ctx)
-                }
-            }
-        }
-        LazyColumn(Modifier.weight(1f)) {
-            items(apps) { (label, intent) ->
-                Text(
-                    label, fontSize = 20.sp, fontWeight = FontWeight.Light,
-                    modifier = Modifier.fillMaxWidth().clickable { ctx.safeStart(intent!!) }.padding(vertical = 12.dp)
-                )
             }
         }
     }
@@ -472,6 +346,7 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
     val ctx = LocalContext.current
     var left by remember { mutableStateOf(store.endTimeMs - System.currentTimeMillis()) }
     var pinned by remember { mutableStateOf(HomeRole.isScreenPinned(ctx)) }
+    var showEmergencyConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         HomeRole.startPinning(ctx.findActivity())
@@ -484,12 +359,12 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
             lastTick = now
 
             val curPinned = HomeRole.isScreenPinned(ctx)
-            // If the user just held Back + Recents to unpin while in the session, immediately re-request pinning!
-            if (prevPinned && !curPinned && !store.allowingDialerExit) {
+            // If the user held Back + Recents to unpin while in the session, immediately re-request pinning!
+            if (prevPinned && !curPinned) {
                 HomeRole.startPinning(ctx.findActivity())
             }
             // Pause the countdown timer whenever the screen is unpinned so unpinning never earns focus time.
-            if (!curPinned && !store.allowingDialerExit) {
+            if (!curPinned) {
                 store.shiftEndTime(dt)
             }
             prevPinned = curPinned
@@ -499,10 +374,29 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
     }
     BackHandler(true) { /* swallow back during a session */ }
 
-    fun launchAllowedOutsideApp(intent: Intent) {
-        store.allowingDialerExit = true
-        HomeRole.stopPinning(ctx.findActivity())
-        ctx.safeStart(intent)
+    if (showEmergencyConfirm) {
+        val num = emergencyNumber()
+        AlertDialog(
+            onDismissRequest = { showEmergencyConfirm = false },
+            containerColor = Line,
+            title = { Text("Emergency Call ($num)", color = Danger, fontSize = 20.sp) },
+            text = {
+                Text(
+                    "Do you need to dial emergency services ($num)?\n\nFor normal phone use, tap Cancel and use 'End early' (solve 5 math problems) to unlock your session.",
+                    color = Fg, fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showEmergencyConfirm = false
+                    HomeRole.stopPinning(ctx.findActivity())
+                    ctx.safeStart(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$num")))
+                }) { Text("Dial $num", color = Danger, fontWeight = FontWeight.Medium) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEmergencyConfirm = false }) { Text("Cancel", color = Accent) }
+            }
+        )
     }
 
     val s = (left / 1000).coerceAtLeast(0)
@@ -523,11 +417,16 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
                     color = Danger, fontSize = 14.sp, fontWeight = FontWeight.Medium
                 )
                 Text(
-                    "Your timer only counts down while the screen is pinned. Tap here and choose 'Got it' / 'Allow' to lock the screen.",
+                    "Your timer only counts down while the screen is pinned. Tap below and choose 'Got it' / 'Allow' to lock the screen.",
                     color = Fg, fontSize = 13.sp, textAlign = TextAlign.Center
                 )
-                Link("Lock Screen Now  ›", color = Accent, size = 15) {
-                    HomeRole.startPinning(ctx.findActivity())
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Link("Lock Screen Now ›", color = Accent, size = 15) {
+                        HomeRole.startPinning(ctx.findActivity())
+                    }
+                    Link("Require PIN to unpin ›", color = Muted, size = 13) {
+                        HomeRole.openSecuritySettings(ctx)
+                    }
                 }
             }
         }
@@ -554,16 +453,10 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
         }
         Spacer(Modifier.weight(1f))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Link("Phone", size = 16) { launchAllowedOutsideApp(Intent(Intent.ACTION_DIAL)) }
-            Link("Contacts", size = 16) {
-                launchAllowedOutsideApp(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CONTACTS))
-            }
-            Link("Emergency", color = Danger, size = 16) {
-                launchAllowedOutsideApp(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${emergencyNumber()}")))
-            }
+        Link("End early (solve 5 math problems)", color = Accent, size = 15, onClick = onQuit)
+        Link("Emergency call (${emergencyNumber()})", color = Danger.copy(alpha = 0.8f), size = 13) {
+            showEmergencyConfirm = true
         }
-        Link("End early", color = Muted.copy(alpha = 0.7f), size = 14, onClick = onQuit)
     }
 }
 
