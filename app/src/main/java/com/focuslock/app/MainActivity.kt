@@ -37,7 +37,6 @@ import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
     private lateinit var store: SessionStore
-    private var leftTimestampMs: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,26 +72,12 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         HomeRole.clearReturnToLockNotification(this)
         if (::store.isInitialized) {
-            if (leftTimestampMs > 0L && store.isActive) {
-                // Pause the timer for the exact duration the user had minimized the app.
-                val awayMs = (System.currentTimeMillis() - leftTimestampMs).coerceAtLeast(0L)
-                store.shiftEndTime(awayMs)
-            }
-            leftTimestampMs = 0L
             if (store.isActive) {
                 store.enforceIfActive()
                 setImmersiveSessionMode(true)
             } else {
                 setImmersiveSessionMode(false)
             }
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        if (::store.isInitialized && store.isActive && !isChangingConfigurations) {
-            leftTimestampMs = System.currentTimeMillis()
-            HomeRole.showReturnToLockNotification(this)
         }
     }
 
@@ -152,6 +137,7 @@ private fun App(store: SessionStore) {
     DisposableEffect(Unit) { onDispose { music.release() } }
 
     fun finish() {
+        LockOverlay.hide(appCtx)
         val act = ctx.findActivity() as? MainActivity
         HomeRole.stopPinning(act)
         HomeRole.clearReturnToLockNotification(ctx)
@@ -164,9 +150,17 @@ private fun App(store: SessionStore) {
     }
 
     LaunchedEffect(active) {
+        if (active) {
+            LockOverlay.show(appCtx, store, music) { finish() }
+        } else {
+            LockOverlay.hide(appCtx)
+        }
         while (active) {
             delay(500)
             store.enforceIfActive()
+            if (!LockOverlay.isShowing && HomeRole.canDrawOverlays(appCtx) && store.isActive) {
+                LockOverlay.show(appCtx, store, music) { finish() }
+            }
             if (!store.isActive) finish()
         }
     }
@@ -211,7 +205,7 @@ private fun App(store: SessionStore) {
                                 active = true
                                 val act = ctx.findActivity() as? MainActivity
                                 act?.setImmersiveSessionMode(true)
-                                HomeRole.startPinning(act)
+                                LockOverlay.show(appCtx, store, music) { finish() }
                             },
                             onPaywall = { paywallOut = true; showPaywall = true }
                         )
@@ -233,16 +227,22 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
     val nm = ctx.getSystemService(NotificationManager::class.java)
     var minutes by remember { mutableStateOf(25) }
     var dndOk by remember { mutableStateOf(nm.isNotificationPolicyAccessGranted) }
+    var overlayOk by remember { mutableStateOf(HomeRole.canDrawOverlays(ctx)) }
     var showSetupGate by remember { mutableStateOf(false) }
 
     fun requestDndAccess() {
         HomeRole.openDndSettings(ctx)
     }
 
+    fun requestOverlayAccess() {
+        HomeRole.openOverlaySettings(ctx)
+    }
+
     LaunchedEffect(Unit) {
         while (true) {
             dndOk = nm.isNotificationPolicyAccessGranted
-            if (dndOk && showSetupGate) {
+            overlayOk = HomeRole.canDrawOverlays(ctx)
+            if (dndOk && overlayOk && showSetupGate) {
                 showSetupGate = false
             }
             delay(500)
@@ -253,11 +253,11 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
         AlertDialog(
             onDismissRequest = { showSetupGate = false },
             containerColor = Line,
-            title = { Text("Enable Notification Blocking", color = Fg, fontSize = 20.sp) },
+            title = { Text("Enable Lock Protection", color = Fg, fontSize = 20.sp) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Allow Do Not Disturb access for FocusLock so notifications and popups are silenced during your study session (your study music will still play normally):",
+                        "Enable these two one-time permissions so FocusLock can silence notifications and stay locked on screen when Home is pressed:",
                         color = Muted, fontSize = 14.sp
                     )
                     Row(
@@ -268,21 +268,48 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Do Not Disturb Access", color = Fg, fontWeight = FontWeight.Medium)
+                            Text("1. Do Not Disturb Access", color = Fg, fontWeight = FontWeight.Medium)
                             Text(
-                                if (dndOk) "Granted" else "Tap to switch ON FocusLock in Do Not Disturb access",
+                                if (dndOk) "Granted" else "Find 'FocusLock' in list and switch ON",
                                 color = if (dndOk) Accent else Muted, fontSize = 12.sp
                             )
                         }
                         Text(if (dndOk) "✓ Done" else "Enable ›", color = Accent, fontWeight = FontWeight.Medium)
                     }
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Bg)
+                            .clickable { if (!overlayOk) requestOverlayAccess() }
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("2. Display Over Other Apps", color = Fg, fontWeight = FontWeight.Medium)
+                            Text(
+                                if (overlayOk) "Granted" else "Keeps lock screen on top if Home is pressed",
+                                color = if (overlayOk) Accent else Muted, fontSize = 12.sp
+                            )
+                        }
+                        Text(if (overlayOk) "✓ Done" else "Enable ›", color = Accent, fontWeight = FontWeight.Medium)
+                    }
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (!dndOk) requestDndAccess() else showSetupGate = false
+                    when {
+                        !dndOk -> requestDndAccess()
+                        !overlayOk -> requestOverlayAccess()
+                        else -> showSetupGate = false
+                    }
                 }) {
-                    Text(if (!dndOk) "Open Settings" else "Done", color = Accent)
+                    Text(
+                        when {
+                            !dndOk -> "1. Open DND Settings"
+                            !overlayOk -> "2. Allow Appear on Top"
+                            else -> "Done"
+                        },
+                        color = Accent
+                    )
                 }
             },
             dismissButton = {
@@ -309,10 +336,11 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
         Spacer(Modifier.height(32.dp))
         val limited = Entitlement.limitsApply()
         val left = if (limited) Entitlement.freeMinutesLeft(store.stats) else Int.MAX_VALUE
+        val readyToLock = dndOk && overlayOk
         Box(
             Modifier.size(132.dp).clip(CircleShape).background(Accent)
                 .clickable {
-                    if (!dndOk) {
+                    if (!readyToLock) {
                         showSetupGate = true
                     } else if (limited && left <= 0) {
                         onPaywall()
@@ -324,7 +352,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
             contentAlignment = Alignment.Center
         ) {
             Text(
-                if (dndOk) "Start" else "Setup\nLock",
+                if (readyToLock) "Start" else "Setup\nLock",
                 color = Bg, fontSize = 20.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center
             )
         }
@@ -346,7 +374,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
 
         Spacer(Modifier.weight(1f))
 
-        if (!dndOk) {
+        if (!readyToLock) {
             Column(
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
@@ -356,8 +384,19 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text("One-time setup required:", color = Fg, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                Link("Allow Do Not Disturb access (blocks notifications)  ›", color = Accent, size = 14) {
-                    requestDndAccess()
+                if (!dndOk) {
+                    Link("1. Allow Do Not Disturb access (blocks notifications)  ›", color = Accent, size = 14) {
+                        requestDndAccess()
+                    }
+                } else {
+                    Text("✓ 1. Notification blocking ready", color = Muted, fontSize = 13.sp)
+                }
+                if (!overlayOk) {
+                    Link("2. Allow Display over other apps (locks Home button)  ›", color = Accent, size = 14) {
+                        requestOverlayAccess()
+                    }
+                } else {
+                    Text("✓ 2. Screen overlay lock ready", color = Muted, fontSize = 13.sp)
                 }
             }
         }
@@ -368,21 +407,11 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
 private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () -> Unit) {
     val ctx = LocalContext.current
     var left by remember { mutableStateOf(store.endTimeMs - System.currentTimeMillis()) }
-    var pinned by remember { mutableStateOf(HomeRole.isScreenPinned(ctx)) }
     var showEmergencyConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        HomeRole.startPinning(ctx.findActivity())
-        var prevPinned = HomeRole.isScreenPinned(ctx)
         while (true) {
             delay(250)
-            val curPinned = HomeRole.isScreenPinned(ctx)
-            // If the screen was pinned and the user unpinned it, immediately ask to re-pin.
-            if (prevPinned && !curPinned) {
-                HomeRole.startPinning(ctx.findActivity())
-            }
-            prevPinned = curPinned
-            pinned = curPinned
             left = store.endTimeMs - System.currentTimeMillis()
         }
     }
@@ -403,7 +432,7 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
             confirmButton = {
                 TextButton(onClick = {
                     showEmergencyConfirm = false
-                    HomeRole.stopPinning(ctx.findActivity())
+                    LockOverlay.hide(ctx)
                     ctx.safeStart(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$num")))
                 }) { Text("Dial $num", color = Danger, fontWeight = FontWeight.Medium) }
             },
@@ -415,12 +444,6 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
 
     val s = (left / 1000).coerceAtLeast(0)
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        if (!pinned) {
-            Link("Tap to pin screen (locks Home & Recents)  ›", color = Accent, size = 13) {
-                HomeRole.startPinning(ctx.findActivity())
-            }
-        }
-
         Spacer(Modifier.weight(1f))
         Text(
             "%02d:%02d".format(s / 60, s % 60),
@@ -429,7 +452,7 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
             color = Fg
         )
         Text(
-            if (pinned) "screen pinned  •  notifications silenced" else "focusing  •  notifications silenced",
+            "screen locked  •  notifications silenced",
             color = Muted,
             fontSize = 14.sp
         )

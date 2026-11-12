@@ -8,31 +8,49 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 
 /**
- * Helpers for Do Not Disturb access settings, background-leave alerts, and optional Screen Pinning.
+ * Helpers for Do Not Disturb access settings, Display Over Other Apps (overlay lock), and notifications.
  */
 object HomeRole {
     private const val ALERT_CHANNEL_ID = "focuslock_lock_alert"
     private const val ALERT_NOTIF_ID = 9002
 
+    /**
+     * Opens the system "Do Not Disturb access" list directly.
+     * Using ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS directly works reliably across
+     * Android 8–17 including Honor MagicOS 10, Samsung One UI, Xiaomi, and Pixel.
+     */
     fun openDndSettings(ctx: Context) {
-        if (Build.VERSION.SDK_INT >= 30) {
-            try {
-                val detail = Intent(
-                    "android.settings.NOTIFICATION_POLICY_ACCESS_DETAIL_SETTINGS",
-                    Uri.parse("package:${ctx.packageName}")
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                ctx.startActivity(detail)
-                return
-            } catch (_: Exception) {}
-        }
         try {
             ctx.startActivity(
                 Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Exception) {
+            try {
+                ctx.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun canDrawOverlays(ctx: Context): Boolean = Settings.canDrawOverlays(ctx)
+
+    fun openOverlaySettings(ctx: Context) {
+        try {
+            ctx.startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:${ctx.packageName}")
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+            return
+        } catch (_: Exception) {}
+        try {
+            ctx.startActivity(
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         } catch (_: Exception) {
@@ -65,7 +83,6 @@ object HomeRole {
         } catch (_: Exception) {}
     }
 
-    /** Shows an ongoing alert notification if the user minimizes FocusLock during an active session. */
     fun showReturnToLockNotification(ctx: Context) {
         try {
             val nm = ctx.getSystemService(NotificationManager::class.java) ?: return
@@ -74,7 +91,7 @@ object HomeRole {
                 "Focus Session Lock",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Alerts you when you leave an active focus session"
+                description = "Alerts you when a focus session is active"
                 setBypassDnd(true)
             }
             nm.createNotificationChannel(channel)
@@ -90,8 +107,8 @@ object HomeRole {
             )
             val notif = NotificationCompat.Builder(ctx, ALERT_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("Focus session paused!")
-                .setContentText("Return to FocusLock to resume your focus timer.")
+                .setContentTitle("FocusLock session active")
+                .setContentText("Tap to return to FocusLock.")
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setOngoing(true)

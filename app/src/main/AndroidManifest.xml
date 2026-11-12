@@ -5,6 +5,8 @@
     <!-- No Accessibility, overlay, usage-stats, or device-admin permissions on purpose. -->
     <!-- Required so Android lists FocusLock in Settings -> Do Not Disturb access. -->
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Required to keep the FocusLock screen on top when the Home or Recents button is pressed during a session. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- Music playback only; the foreground service is a standard mediaPlayback service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

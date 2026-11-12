@@ -37,11 +37,11 @@ fun Onboarding(onDone: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             Text("FocusLock", fontSize = 36.sp, fontWeight = FontWeight.Light)
             Text("Lock in and study without notifications or app-switching pulling you away.")
-            Text("How FocusLock protects your focus:", color = Muted)
-            Text("1. Do Not Disturb access. Silences all notification popups and alerts during a session while keeping your study music active, then restores your setting afterwards.")
-            Text("2. Screen Pinning. Pins FocusLock on screen during your session so the Home button, Recents switcher and notification shade are locked until the timer finishes (or you solve 5 math challenges).")
+            Text("To lock your screen during a session, FocusLock asks for two settings:", color = Muted)
+            Text("1. Do Not Disturb access. Silences notification popups and alerts during a session while keeping your study music active, then restores your setting afterwards.")
+            Text("2. Display over other apps (Appear on top). Keeps the FocusLock timer screen locked on top during a session so pressing the Home button cannot exit until the timer finishes (or you solve 5 math problems).")
             Text("What we don't do", color = Muted)
-            Text("We don't replace your phone's launcher, and we never read your messages, screen, contacts or location. You can always end a session early by solving the math challenge or call emergency services.")
+            Text("We never change your phone's Home launcher, and we never read your messages, screen, contacts or location. When your session ends, the lock screen closes automatically.")
             Text(
                 if (RemoteFlags.monetization)
                     "Free plan: ${RemoteFlags.freeMinutes} focus minutes every month, with small ads on the Stats, Awards and Style screens (never during a session). FocusLock Pro is an optional monthly or yearly subscription for unlimited focus time and no ads. You can cancel any time in Google Play."
