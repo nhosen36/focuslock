@@ -175,6 +175,8 @@ private fun App(store: SessionStore) {
     var tab by remember { mutableStateOf(0) }
     var showPaywall by remember { mutableStateOf(false) }
     var paywallOut by remember { mutableStateOf(false) }
+    var showBreathing by remember { mutableStateOf(false) }
+    var lastCompletedMinutes by remember { mutableStateOf(0) }
     var unlocked by remember { mutableStateOf<List<String>>(emptyList()) }
     val ctx = LocalContext.current
     val appCtx = ctx.applicationContext
@@ -191,9 +193,11 @@ private fun App(store: SessionStore) {
         HomeRole.clearReturnToLockNotification(ctx)
         act?.setImmersiveSessionMode(false)
         val before = store.stats.earned()
-        store.end()
+        val focusedMins = store.end()
         music.stop()
         unlocked = (store.stats.earned() - before).toList()
+        lastCompletedMinutes = focusedMins
+        showBreathing = true
         active = false; challenge = false; tab = 0
     }
 
@@ -237,6 +241,11 @@ private fun App(store: SessionStore) {
             })
             active && challenge -> Challenge(onSolved = { finish() }, onCancel = { challenge = false })
             active -> FocusScreen(store, music, onQuit = { challenge = true })
+            showBreathing -> BreathingScreen(
+                completedMinutes = lastCompletedMinutes,
+                music = music,
+                onDismiss = { showBreathing = false }
+            )
             showPaywall -> Paywall(outOfMinutes = paywallOut, onClose = { showPaywall = false })
             else -> Column(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f)) {
@@ -250,7 +259,11 @@ private fun App(store: SessionStore) {
                                 act?.setImmersiveSessionMode(true)
                                 LockOverlay.show(appCtx, store, music) { finish() }
                             },
-                            onPaywall = { paywallOut = true; showPaywall = true }
+                            onPaywall = { paywallOut = true; showPaywall = true },
+                            onOpenBreathing = {
+                                lastCompletedMinutes = 0
+                                showBreathing = true
+                            }
                         )
                         1 -> StatsScreen(store.stats)
                         2 -> AwardsScreen(store.stats)
@@ -328,7 +341,8 @@ private fun StartScreen(
     store: SessionStore,
     music: MusicController,
     onStarted: () -> Unit,
-    onPaywall: () -> Unit
+    onPaywall: () -> Unit,
+    onOpenBreathing: () -> Unit
 ) {
     val ctx = LocalContext.current
     val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -468,14 +482,29 @@ private fun StartScreen(
                 Text(calmGreeting().uppercase(), color = Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp)
                 Text("Find your focus.", fontFamily = SerifFont, fontSize = 26.sp, color = Fg)
             }
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(GlassSurface)
-                    .border(1.dp, Accent.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("✦  $streakDays day streak  •  ${totalHrs}h", color = Fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(GlassSurface)
+                        .border(1.dp, GlassBorder, RoundedCornerShape(20.dp))
+                        .clickable { onOpenBreathing() }
+                        .padding(horizontal = 11.dp, vertical = 6.dp)
+                ) {
+                    Text("◯  Breathe", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(GlassSurface)
+                        .border(1.dp, Accent.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                        .padding(horizontal = 11.dp, vertical = 6.dp)
+                ) {
+                    Text("✦  ${streakDays}d  •  ${totalHrs}h", color = Fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
 
