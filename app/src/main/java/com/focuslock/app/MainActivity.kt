@@ -85,6 +85,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && ::store.isInitialized && store.isActive) {
+            setImmersiveSessionMode(true)
+            store.enforceIfActive()
+        }
+    }
+
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         bringBackIfLocked()
@@ -241,12 +249,8 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
         val held = HomeRole.isHeld(ctx)
         homeOk = held
         if (!held) {
-            // Many OEM phones (Samsung, Xiaomi, Vivo, Oppo) require picking FocusLock in Default Home Settings.
-            try {
-                ctx.safeStart(HomeRole.homeSettingsIntent())
-            } catch (_: Exception) {
-                ctx.safeStart(Intent(Settings.ACTION_SETTINGS))
-            }
+            // Many OEM phones (Samsung, Honor, Xiaomi, Vivo, Oppo) require picking FocusLock in Default Home Settings.
+            HomeRole.openHomeSettings(ctx)
         }
     }
 
@@ -254,16 +258,12 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
         try {
             homeLauncher.launch(HomeRole.requestIntent(ctx))
         } catch (_: Exception) {
-            try {
-                ctx.safeStart(HomeRole.homeSettingsIntent())
-            } catch (_: Exception) {
-                ctx.safeStart(Intent(Settings.ACTION_SETTINGS))
-            }
+            HomeRole.openHomeSettings(ctx)
         }
     }
 
     fun requestDndAccess() {
-        ctx.safeStart(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+        HomeRole.openDndSettings(ctx)
     }
 
     LaunchedEffect(Unit) {
@@ -273,7 +273,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
             if (dndOk && homeOk && showSetupGate) {
                 showSetupGate = false
             }
-            delay(600)
+            delay(500)
         }
     }
 
@@ -285,7 +285,7 @@ private fun StartScreen(store: SessionStore, onStarted: () -> Unit, onPaywall: (
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "To block notifications and stop apps from opening during a session, both steps below must be enabled:",
+                        "To block notifications and lock the screen during a session, enable both steps below:",
                         color = Muted, fontSize = 14.sp
                     )
                     Row(
@@ -452,7 +452,7 @@ fun AppList() {
             ) {
                 Text("Done studying?", color = Muted, fontSize = 13.sp)
                 Link("Switch back to normal Home launcher ›", color = Accent, size = 13) {
-                    ctx.safeStart(HomeRole.homeSettingsIntent())
+                    HomeRole.openHomeSettings(ctx)
                 }
             }
         }
@@ -475,10 +475,26 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
 
     LaunchedEffect(Unit) {
         HomeRole.startPinning(ctx.findActivity())
+        var prevPinned = HomeRole.isScreenPinned(ctx)
+        var lastTick = System.currentTimeMillis()
         while (true) {
+            delay(200)
+            val now = System.currentTimeMillis()
+            val dt = (now - lastTick).coerceAtLeast(0L)
+            lastTick = now
+
+            val curPinned = HomeRole.isScreenPinned(ctx)
+            // If the user just held Back + Recents to unpin while in the session, immediately re-request pinning!
+            if (prevPinned && !curPinned && !store.allowingDialerExit) {
+                HomeRole.startPinning(ctx.findActivity())
+            }
+            // Pause the countdown timer whenever the screen is unpinned so unpinning never earns focus time.
+            if (!curPinned && !store.allowingDialerExit) {
+                store.shiftEndTime(dt)
+            }
+            prevPinned = curPinned
+            pinned = curPinned
             left = store.endTimeMs - System.currentTimeMillis()
-            pinned = HomeRole.isScreenPinned(ctx)
-            delay(250)
         }
     }
     BackHandler(true) { /* swallow back during a session */ }
@@ -492,27 +508,41 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
     val s = (left / 1000).coerceAtLeast(0)
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (!pinned) {
-            Box(
+            Column(
                 Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .background(Line)
-                    .border(1.dp, Accent, RoundedCornerShape(12.dp))
+                    .border(1.dp, Danger, RoundedCornerShape(14.dp))
                     .clickable { HomeRole.startPinning(ctx.findActivity()) }
-                    .padding(12.dp),
-                contentAlignment = Alignment.Center
+                    .padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    "Tap here & select 'Got it' to pin screen (blocks Recents & Notification bar)",
-                    color = Accent, fontSize = 13.sp, textAlign = TextAlign.Center
+                    "TIMER PAUSED — SCREEN UNPINNED",
+                    color = Danger, fontSize = 14.sp, fontWeight = FontWeight.Medium
                 )
+                Text(
+                    "Your timer only counts down while the screen is pinned. Tap here and choose 'Got it' / 'Allow' to lock the screen.",
+                    color = Fg, fontSize = 13.sp, textAlign = TextAlign.Center
+                )
+                Link("Lock Screen Now  ›", color = Accent, size = 15) {
+                    HomeRole.startPinning(ctx.findActivity())
+                }
             }
         }
 
         Spacer(Modifier.weight(1f))
-        Text("%02d:%02d".format(s / 60, s % 60), fontSize = 88.sp, fontWeight = FontWeight.Thin)
         Text(
-            if (pinned) "screen locked  •  notifications silenced" else "focusing  •  notifications silenced",
-            color = Muted, fontSize = 14.sp
+            "%02d:%02d".format(s / 60, s % 60),
+            fontSize = 88.sp,
+            fontWeight = FontWeight.Thin,
+            color = if (pinned) Fg else Muted
+        )
+        Text(
+            if (pinned) "screen locked  •  notifications silenced" else "timer paused until screen is pinned",
+            color = if (pinned) Muted else Danger,
+            fontSize = 14.sp
         )
 
         if (music.hasMusic) {

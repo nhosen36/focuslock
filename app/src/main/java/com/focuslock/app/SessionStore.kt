@@ -73,6 +73,19 @@ class SessionStore(private val context: Context) {
         }
     }
 
+    /** Pauses the countdown while the screen is unpinned so unpinned time never counts toward the session. */
+    fun shiftEndTime(deltaMs: Long) {
+        if (deltaMs <= 0L) return
+        val end = endTimeMs
+        val start = prefs.getLong("start", 0L)
+        if (end > 0L) {
+            prefs.edit()
+                .putLong("end", end + deltaMs)
+                .putLong("start", start + deltaMs)
+                .apply()
+        }
+    }
+
     /** Re-enforces DND if the user or system toggled it off while a session is still running. */
     fun enforceIfActive() {
         if (isActive && nm.isNotificationPolicyAccessGranted) {

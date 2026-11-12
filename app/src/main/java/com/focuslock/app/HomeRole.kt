@@ -6,12 +6,12 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 
 /**
- * Checks and requests the Default Home app role, plus Android Screen Pinning (LockTask) helpers
- * so the user cannot minimize FocusLock or pull down the notification shade during a session.
+ * Checks and requests the Default Home app role, DND access settings, and Android Screen Pinning (LockTask).
  */
 object HomeRole {
     fun isHeld(ctx: Context): Boolean {
@@ -29,10 +29,45 @@ object HomeRole {
             val rm = ctx.getSystemService(RoleManager::class.java)
             if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME)) return rm.createRequestRoleIntent(RoleManager.ROLE_HOME)
         }
-        return homeSettingsIntent()
+        return Intent(Settings.ACTION_HOME_SETTINGS)
     }
 
-    fun homeSettingsIntent(): Intent = Intent(Settings.ACTION_HOME_SETTINGS)
+    fun openHomeSettings(ctx: Context) {
+        val intents = listOf(
+            Intent(Settings.ACTION_HOME_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        for (i in intents) {
+            try {
+                ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun openDndSettings(ctx: Context) {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                val detail = Intent(
+                    "android.settings.NOTIFICATION_POLICY_ACCESS_DETAIL_SETTINGS",
+                    Uri.parse("package:${ctx.packageName}")
+                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                ctx.startActivity(detail)
+                return
+            } catch (_: Exception) {}
+        }
+        try {
+            ctx.startActivity(
+                Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: Exception) {
+            try {
+                ctx.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) {}
+        }
+    }
 
     fun isScreenPinned(ctx: Context): Boolean {
         val am = ctx.getSystemService(ActivityManager::class.java) ?: return false

@@ -5,6 +5,9 @@
     <!-- No Accessibility, overlay, usage-stats, or device-admin permissions on purpose. -->
     <!-- DND access is granted by the user in system Settings (not a manifest permission). -->
 
+    <!-- Required so Android lists FocusLock in Settings -> Do Not Disturb access. -->
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
     <!-- Music playback only; the foreground service is a standard mediaPlayback service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
