@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -36,6 +37,7 @@ import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
     private lateinit var store: SessionStore
+    private var leftTimestampMs: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,13 +71,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        HomeRole.clearReturnToLockNotification(this)
         if (::store.isInitialized) {
+            if (leftTimestampMs > 0L && store.isActive) {
+                // Pause the timer for the exact duration the user had minimized the app.
+                val awayMs = (System.currentTimeMillis() - leftTimestampMs).coerceAtLeast(0L)
+                store.shiftEndTime(awayMs)
+            }
+            leftTimestampMs = 0L
             if (store.isActive) {
                 store.enforceIfActive()
                 setImmersiveSessionMode(true)
             } else {
                 setImmersiveSessionMode(false)
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (::store.isInitialized && store.isActive && !isChangingConfigurations) {
+            leftTimestampMs = System.currentTimeMillis()
+            HomeRole.showReturnToLockNotification(this)
         }
     }
 
@@ -89,6 +106,11 @@ class MainActivity : ComponentActivity() {
 
     fun setImmersiveSessionMode(active: Boolean) {
         try {
+            if (active) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
             val controller = WindowCompat.getInsetsController(window, window.decorView)
             controller.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -132,6 +154,7 @@ private fun App(store: SessionStore) {
     fun finish() {
         val act = ctx.findActivity() as? MainActivity
         HomeRole.stopPinning(act)
+        HomeRole.clearReturnToLockNotification(ctx)
         act?.setImmersiveSessionMode(false)
         val before = store.stats.earned()
         store.end()
@@ -351,21 +374,12 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
     LaunchedEffect(Unit) {
         HomeRole.startPinning(ctx.findActivity())
         var prevPinned = HomeRole.isScreenPinned(ctx)
-        var lastTick = System.currentTimeMillis()
         while (true) {
-            delay(200)
-            val now = System.currentTimeMillis()
-            val dt = (now - lastTick).coerceAtLeast(0L)
-            lastTick = now
-
+            delay(250)
             val curPinned = HomeRole.isScreenPinned(ctx)
-            // If the user held Back + Recents to unpin while in the session, immediately re-request pinning!
+            // If the screen was pinned and the user unpinned it, immediately ask to re-pin.
             if (prevPinned && !curPinned) {
                 HomeRole.startPinning(ctx.findActivity())
-            }
-            // Pause the countdown timer whenever the screen is unpinned so unpinning never earns focus time.
-            if (!curPinned) {
-                store.shiftEndTime(dt)
             }
             prevPinned = curPinned
             pinned = curPinned
@@ -402,32 +416,8 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
     val s = (left / 1000).coerceAtLeast(0)
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         if (!pinned) {
-            Column(
-                Modifier.fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Line)
-                    .border(1.dp, Danger, RoundedCornerShape(14.dp))
-                    .clickable { HomeRole.startPinning(ctx.findActivity()) }
-                    .padding(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    "TIMER PAUSED — SCREEN UNPINNED",
-                    color = Danger, fontSize = 14.sp, fontWeight = FontWeight.Medium
-                )
-                Text(
-                    "Your timer only counts down while the screen is pinned. Tap below and choose 'Got it' / 'Allow' to lock the screen.",
-                    color = Fg, fontSize = 13.sp, textAlign = TextAlign.Center
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Link("Lock Screen Now ›", color = Accent, size = 15) {
-                        HomeRole.startPinning(ctx.findActivity())
-                    }
-                    Link("Require PIN to unpin ›", color = Muted, size = 13) {
-                        HomeRole.openSecuritySettings(ctx)
-                    }
-                }
+            Link("Tap to pin screen (locks Home & Recents)  ›", color = Accent, size = 13) {
+                HomeRole.startPinning(ctx.findActivity())
             }
         }
 
@@ -436,11 +426,11 @@ private fun FocusScreen(store: SessionStore, music: MusicController, onQuit: () 
             "%02d:%02d".format(s / 60, s % 60),
             fontSize = 88.sp,
             fontWeight = FontWeight.Thin,
-            color = if (pinned) Fg else Muted
+            color = Fg
         )
         Text(
-            if (pinned) "screen locked  •  notifications silenced" else "timer paused until screen is pinned",
-            color = if (pinned) Muted else Danger,
+            if (pinned) "screen pinned  •  notifications silenced" else "focusing  •  notifications silenced",
+            color = Muted,
             fontSize = 14.sp
         )
 

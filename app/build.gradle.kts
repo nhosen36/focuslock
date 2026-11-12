@@ -5,8 +5,8 @@ plugins {
 }
 
 // Release values come from the command line (CI passes them): -PversionCode=12 -PversionName=1.0.3
-val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 4
-val appVersionName = (findProperty("versionName") as String?) ?: "1.0.3"
+val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 5
+val appVersionName = (findProperty("versionName") as String?) ?: "1.0.4"
 
 android {
     namespace = "com.focuslock.app"
