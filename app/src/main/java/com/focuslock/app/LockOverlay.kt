@@ -25,7 +25,7 @@ import androidx.compose.ui.graphics.toArgb
 import kotlin.random.Random
 
 /**
- * System-level full-screen lock overlay (TYPE_APPLICATION_OVERLAY).
+ * Calm-styled system-level full-screen lock overlay (TYPE_APPLICATION_OVERLAY).
  * Stays on top even if the user swipes the Home gesture twice or presses Recents,
  * and removes itself automatically the instant the session ends or the 5 math problems are solved.
  */
@@ -51,10 +51,6 @@ object LockOverlay {
         } catch (_: Exception) {}
     }
 
-    /**
-     * Re-asserts the overlay at the very top of WindowManager when OEM ROMs (like Honor MagicOS)
-     * try to hide floating windows during a Home swipe gesture.
-     */
     fun reassertOnTop(context: Context) {
         val appCtx = context.applicationContext
         val wm = appCtx.getSystemService(WindowManager::class.java) ?: return
@@ -96,11 +92,14 @@ object LockOverlay {
         val density = appCtx.resources.displayMetrics.density
         fun dp(v: Int): Int = (v * density).toInt()
 
-        val bgInt = Color.parseColor("#0B0B0D")
-        val cardInt = Color.parseColor("#16161B")
-        val fgInt = Color.parseColor("#F2F2F7")
-        val mutedInt = Color.parseColor("#8E8E9A")
-        val dangerInt = Color.parseColor("#F87171")
+        val bgTop = Color.parseColor("#090D1A")
+        val bgMid = Color.parseColor("#111B34")
+        val bgBot = Color.parseColor("#070A14")
+        val glassInt = Color.parseColor("#CC162038")
+        val borderSubtle = Color.parseColor("#26FFFFFF")
+        val fgInt = Color.parseColor("#F4F6FB")
+        val mutedInt = Color.parseColor("#9BA3B8")
+        val dangerInt = Color.parseColor("#FF7B7B")
         val accentInt = ThemeState.accent.toArgb()
 
         val root = object : FrameLayout(appCtx) {
@@ -131,88 +130,143 @@ object LockOverlay {
                 }
             }
         }.apply {
-            setBackgroundColor(bgInt)
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(bgTop, bgMid, bgBot)
+            )
             isFocusable = true
             isFocusableInTouchMode = true
             applyImmersiveFlags(this)
             @Suppress("DEPRECATION")
             setOnSystemUiVisibilityChangeListener {
-                // Immediately re-hide the gesture/nav bar on the 1st swipe so a 2nd swipe cannot trigger Home.
                 handler.postDelayed({ applyImmersiveFlags(this) }, 30L)
             }
         }
 
-        // --- container 1: Timer Screen ---
+        // --- container 1: Calm Timer Screen ---
         val timerContainer = LinearLayout(appCtx).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(dp(24), dp(48), dp(24), dp(36))
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(24), dp(52), dp(24), dp(36))
         }
 
-        val topSpacer = View(appCtx)
-        timerContainer.addView(topSpacer, LinearLayout.LayoutParams(1, 0, 1f))
-
-        val timerText = TextView(appCtx).apply {
-            setTextColor(fgInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 86f)
-            typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+        val topTag = TextView(appCtx).apply {
+            setTextColor(accentInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             gravity = Gravity.CENTER
-            text = "25:00"
+            letterSpacing = 0.18f
+            text = "DEEP FOCUS IN PROGRESS"
         }
-        timerContainer.addView(timerText)
+        timerContainer.addView(topTag)
 
-        val statusText = TextView(appCtx).apply {
+        val topSubtitle = TextView(appCtx).apply {
             setTextColor(mutedInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            typeface = Typeface.create("serif", Typeface.NORMAL)
             gravity = Gravity.CENTER
-            text = "screen locked  •  notifications silenced"
+            setPadding(0, dp(6), 0, 0)
+            text = "Stay present. Distractions are silenced."
         }
-        timerContainer.addView(statusText)
+        timerContainer.addView(topSubtitle)
 
-        val musicBtn = TextView(appCtx).apply {
-            setTextColor(fgInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
+        timerContainer.addView(View(appCtx), LinearLayout.LayoutParams(1, 0, 1f))
+
+        // Circular halo dial around the countdown
+        val dialBox = LinearLayout(appCtx).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(cardInt)
+                setColor(Color.parseColor("#33162038"))
+                setStroke(dp(3), accentInt)
+            }
+        }
+        val timerText = TextView(appCtx).apply {
+            setTextColor(fgInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 68f)
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            text = "25:00"
+        }
+        val remLabel = TextView(appCtx).apply {
+            setTextColor(mutedInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            letterSpacing = 0.2f
+            gravity = Gravity.CENTER
+            text = "REMAINING"
+        }
+        dialBox.addView(timerText)
+        dialBox.addView(remLabel)
+        timerContainer.addView(
+            dialBox,
+            LinearLayout.LayoutParams(dp(256), dp(256))
+        )
+
+        fun musicButtonText(playing: Boolean) =
+            if (playing) "❚❚   Pause Ambient Sound" else "▶   Play Ambient Sound"
+
+        val musicBtn = TextView(appCtx).apply {
+            setTextColor(fgInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER
+            setPadding(dp(24), dp(13), dp(24), dp(13))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(28).toFloat()
+                setColor(glassInt)
                 setStroke(dp(1), accentInt)
             }
-            text = if (music.isPlaying) "❚❚" else "▶"
+            text = musicButtonText(music.isPlaying)
             visibility = if (music.hasMusic) View.VISIBLE else View.GONE
             setOnClickListener {
                 music.toggle()
-                postDelayed({ text = if (music.isPlaying) "❚❚" else "▶" }, 150)
+                postDelayed({ text = musicButtonText(music.isPlaying) }, 150)
             }
         }
         timerContainer.addView(
             musicBtn,
-            LinearLayout.LayoutParams(dp(78), dp(78)).apply { topMargin = dp(38) }
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(28) }
         )
 
-        val bottomSpacer = View(appCtx)
-        timerContainer.addView(bottomSpacer, LinearLayout.LayoutParams(1, 0, 1f))
+        timerContainer.addView(View(appCtx), LinearLayout.LayoutParams(1, 0, 1f))
 
         val endEarlyBtn = TextView(appCtx).apply {
-            setTextColor(accentInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(fgInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            text = "End early (solve 5 math problems)"
+            setPadding(dp(24), dp(13), dp(24), dp(13))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(28).toFloat()
+                setColor(glassInt)
+                setStroke(dp(1), borderSubtle)
+            }
+            text = "End Early (Solve 5 Math Challenges)"
         }
-        timerContainer.addView(endEarlyBtn)
+        timerContainer.addView(
+            endEarlyBtn,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         val emergencyNum = emergencyNumber()
         val emergencyBtn = TextView(appCtx).apply {
             setTextColor(dangerInt)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             gravity = Gravity.CENTER
-            setPadding(dp(16), dp(8), dp(16), dp(8))
-            text = "Emergency call ($emergencyNum)"
+            setPadding(dp(16), dp(12), dp(16), dp(8))
+            text = "Emergency Call ($emergencyNum)"
         }
         timerContainer.addView(emergencyBtn)
 
-        // --- container 2: Math Challenge Screen (with built-in keypad) ---
+        // --- container 2: Math Challenge Screen (with built-in glass keypad) ---
         val challengeContainer = LinearLayout(appCtx).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -227,8 +281,10 @@ object LockOverlay {
         var typedAnswer = ""
 
         val progressText = TextView(appCtx).apply {
-            setTextColor(mutedInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(accentInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            letterSpacing = 0.15f
             gravity = Gravity.CENTER
         }
         val problemText = TextView(appCtx).apply {
@@ -240,10 +296,11 @@ object LockOverlay {
         val answerBox = TextView(appCtx).apply {
             setTextColor(fgInt)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
-                setColor(cardInt)
+                cornerRadius = dp(16).toFloat()
+                setColor(glassInt)
                 setStroke(dp(1), accentInt)
             }
             setPadding(dp(24), dp(12), dp(24), dp(12))
@@ -256,15 +313,15 @@ object LockOverlay {
         }
 
         fun updateChallengeLabels(wrong: Boolean = false) {
-            progressText.text = "${probIndex + 1} of $totalProblems"
+            progressText.text = "MIND CHECK  •  ${probIndex + 1} OF $totalProblems"
             problemText.text = "$numA × $numB"
             answerBox.text = if (typedAnswer.isEmpty()) " " else typedAnswer
             if (wrong) {
                 hintText.setTextColor(dangerInt)
-                hintText.text = "Wrong. Starting over from 1 of $totalProblems."
+                hintText.text = "Incorrect — restarting from problem 1 of $totalProblems"
             } else {
                 hintText.setTextColor(mutedInt)
-                hintText.text = "Solve all $totalProblems to unlock early."
+                hintText.text = "Solve all $totalProblems problems to end your session early"
             }
         }
         updateChallengeLabels()
@@ -288,12 +345,14 @@ object LockOverlay {
         for (k in keys) {
             val keyBtn = TextView(appCtx).apply {
                 text = k
-                setTextColor(if (k == "✓") bgInt else fgInt)
+                setTextColor(if (k == "✓") bgTop else fgInt)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
                 gravity = Gravity.CENTER
                 background = GradientDrawable().apply {
-                    cornerRadius = dp(14).toFloat()
-                    setColor(if (k == "✓") accentInt else cardInt)
+                    cornerRadius = dp(16).toFloat()
+                    setColor(if (k == "✓") accentInt else glassInt)
+                    setStroke(dp(1), if (k == "✓") accentInt else borderSubtle)
                 }
                 setOnClickListener {
                     when (k) {
@@ -333,9 +392,9 @@ object LockOverlay {
                 }
             }
             val lp = GridLayout.LayoutParams().apply {
-                width = dp(78)
-                height = dp(58)
-                setMargins(dp(6), dp(6), dp(6), dp(6))
+                width = dp(82)
+                height = dp(56)
+                setMargins(dp(5), dp(5), dp(5), dp(5))
             }
             grid.addView(keyBtn, lp)
         }
@@ -343,17 +402,29 @@ object LockOverlay {
         challengeContainer.addView(View(appCtx), LinearLayout.LayoutParams(1, 0, 1f))
 
         val backToFocusBtn = TextView(appCtx).apply {
-            setTextColor(mutedInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextColor(fgInt)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            text = "Back to focus"
+            setPadding(dp(22), dp(12), dp(22), dp(12))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(28).toFloat()
+                setColor(glassInt)
+                setStroke(dp(1), borderSubtle)
+            }
+            text = "Return to Focus Session"
             setOnClickListener {
                 challengeContainer.visibility = View.GONE
                 timerContainer.visibility = View.VISIBLE
             }
         }
-        challengeContainer.addView(backToFocusBtn)
+        challengeContainer.addView(
+            backToFocusBtn,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         // --- container 3: Emergency Call Confirmation ---
         val emergencyContainer = LinearLayout(appCtx).apply {
@@ -365,6 +436,7 @@ object LockOverlay {
         val emTitle = TextView(appCtx).apply {
             setTextColor(dangerInt)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            typeface = Typeface.create("serif", Typeface.NORMAL)
             gravity = Gravity.CENTER
             text = "Emergency Call ($emergencyNum)"
         }
@@ -373,17 +445,18 @@ object LockOverlay {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             gravity = Gravity.CENTER
             setPadding(0, dp(16), 0, dp(28))
-            text = "Do you need to dial emergency services ($emergencyNum)?\n\nFor normal phone use, tap Cancel and solve the 5 math problems in 'End early'."
+            text = "Do you need to dial emergency services ($emergencyNum)?\n\nFor normal phone use, tap Cancel and solve the 5 math problems in 'End Early'."
         }
         val dialNowBtn = TextView(appCtx).apply {
-            setTextColor(bgInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTextColor(bgTop)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
-                cornerRadius = dp(12).toFloat()
+                cornerRadius = dp(28).toFloat()
                 setColor(dangerInt)
             }
-            setPadding(dp(28), dp(14), dp(28), dp(14))
+            setPadding(dp(32), dp(14), dp(32), dp(14))
             text = "Dial $emergencyNum"
             setOnClickListener {
                 hide(appCtx)
@@ -397,10 +470,10 @@ object LockOverlay {
         }
         val cancelEmBtn = TextView(appCtx).apply {
             setTextColor(accentInt)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             gravity = Gravity.CENTER
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-            text = "Cancel (Back to focus)"
+            setPadding(dp(20), dp(18), dp(20), dp(16))
+            text = "Cancel (Return to Focus)"
             setOnClickListener {
                 emergencyContainer.visibility = View.GONE
                 timerContainer.visibility = View.VISIBLE
@@ -480,7 +553,7 @@ object LockOverlay {
                 applyImmersiveFlags(curRoot)
                 val sec = (remMs / 1000L).coerceAtLeast(0L)
                 timerText.text = "%02d:%02d".format(sec / 60, sec % 60)
-                musicBtn.text = if (music.isPlaying) "❚❚" else "▶"
+                musicBtn.text = musicButtonText(music.isPlaying)
                 handler.postDelayed(this, 250L)
             }
         }

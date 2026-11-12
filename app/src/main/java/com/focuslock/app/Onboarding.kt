@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -28,32 +29,82 @@ fun emergencyNumber(): String = when (Locale.getDefault().country) {
     else -> "112"
 }
 
-/** Prominent disclosure shown before any permission is requested (Google Play requirement). */
+/** Calm-inspired prominent disclosure shown before any permission is requested. */
 @Composable
 fun Onboarding(onDone: () -> Unit) {
     val ctx = LocalContext.current
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Spacer(Modifier.height(24.dp))
-            Text("FocusLock", fontSize = 36.sp, fontWeight = FontWeight.Light)
-            Text("Lock in and study without notifications or app-switching pulling you away.")
-            Text("To lock your screen during a session, FocusLock asks for two settings:", color = Muted)
-            Text("1. Do Not Disturb access. Silences notification popups and alerts during a session while keeping your study music active, then restores your setting afterwards.")
-            Text("2. Display over other apps (Appear on top). Keeps the FocusLock timer screen locked on top during a session so pressing the Home button cannot exit until the timer finishes (or you solve 5 math problems).")
-            Text("What we don't do", color = Muted)
-            Text("We never change your phone's Home launcher, and we never read your messages, screen, contacts or location. When your session ends, the lock screen closes automatically.")
+        Column(
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Spacer(Modifier.height(18.dp))
+            Text("WELCOME TO FOCUSLOCK", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.8.sp)
             Text(
-                if (RemoteFlags.monetization)
-                    "Free plan: ${RemoteFlags.freeMinutes} focus minutes every month, with small ads on the Stats, Awards and Style screens (never during a session). FocusLock Pro is an optional monthly or yearly subscription for unlimited focus time and no ads. You can cancel any time in Google Play."
-                else "FocusLock is free to use right now. Later, a free plan with monthly minutes and small ads, plus an optional subscription, may be introduced.",
-                color = Muted, fontSize = 13.sp
+                "A quiet sanctuary for deep study.",
+                fontFamily = SerifFont,
+                fontSize = 30.sp,
+                color = Fg,
+                textAlign = TextAlign.Center
             )
-            Text("By continuing you confirm you are 13 or older and accept the privacy policy.", color = Muted, fontSize = 13.sp)
-            Link("Read the privacy policy", color = Accent) { ctx.openUrl(RemoteFlags.PRIVACY_URL) }
+            Text(
+                "Silence notifications, lock away distractions, and immerse yourself in calm ambient study music.",
+                color = Muted,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 22.dp,
+                borderColor = Accent.copy(alpha = 0.35f),
+                padding = 18.dp
+            ) {
+                Text("How FocusLock Protects Your Time", color = Fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "1. Do Not Disturb Access — Silences notification popups and alerts during your session while keeping study music active, then restores your setting afterwards.",
+                    color = Muted,
+                    fontSize = 13.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "2. Display Over Other Apps — Keeps the FocusLock timer screen locked on top during a session so pressing Home cannot exit until the timer ends (or you solve 5 math challenges).",
+                    color = Muted,
+                    fontSize = 13.sp
+                )
+            }
+
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 22.dp,
+                padding = 16.dp
+            ) {
+                Text("Your Privacy & Control", color = Fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "We never change your phone's Home launcher, and we never read your messages, screen, contacts, or location. All focus history stays privately on your device.",
+                    color = Muted,
+                    fontSize = 13.sp
+                )
+            }
+
+            Text(
+                "By continuing you confirm you are 13 or older and accept our privacy policy.",
+                color = Muted,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
+            Link("Read Privacy Policy ›", color = Accent, size = 13) { ctx.openUrl(RemoteFlags.PRIVACY_URL) }
         }
-        Box(
-            Modifier.fillMaxWidth().padding(top = 12.dp),
-            contentAlignment = Alignment.Center
-        ) { Link("I agree, continue", color = Accent, size = 20, onClick = onDone) }
+        Spacer(Modifier.height(10.dp))
+        PrimaryPillButton(
+            text = "Enter Focus Sanctuary",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onDone
+        )
     }
 }

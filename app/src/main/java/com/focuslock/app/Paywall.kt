@@ -9,14 +9,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 private const val MANAGE_SUBS_URL = "https://play.google.com/store/account/subscriptions"
 
 /**
- * The subscription screen. Opened when the free minutes run out, or from any "Go Pro" / "Remove ads" link.
- * Billing terms are shown plainly, as Google Play requires.
+ * Calm-inspired subscription screen. Opened when free monthly minutes run out or from any Pro upgrade CTA.
  */
 @Composable
 fun Paywall(outOfMinutes: Boolean, onClose: () -> Unit) {
@@ -25,48 +25,93 @@ fun Paywall(outOfMinutes: Boolean, onClose: () -> Unit) {
 
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("FOCUSLOCK PRO", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.8.sp)
             Text(
-                if (outOfMinutes) "You've used your ${RemoteFlags.freeMinutes} free minutes this month" else "FocusLock Pro",
-                fontSize = 26.sp, fontWeight = FontWeight.Light
+                if (outOfMinutes) "Continue Your Focus Journey" else "Unlimited Deep Focus",
+                fontFamily = SerifFont,
+                fontSize = 28.sp,
+                color = Fg,
+                textAlign = TextAlign.Center
             )
             Text(
-                if (outOfMinutes) "Free minutes reset on the 1st of every month. Or go Pro and keep focusing now."
-                else "Unlimited focus time, and no ads.",
-                color = Muted
+                if (outOfMinutes)
+                    "You've completed your ${RemoteFlags.freeMinutes} free focus minutes for this month. Free minutes reset on the 1st, or unlock Pro now for unlimited sessions."
+                else
+                    "Experience limitless distraction-free study sessions and a completely ad-free sanctuary.",
+                color = Muted,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(4.dp))
-            Text("• Unlimited focus sessions, every month")
-            Text("• No ads")
-            Text("• Cancel any time in Google Play")
 
-            Spacer(Modifier.height(8.dp))
-            if (billing.plans.isEmpty()) {
-                Text("Loading prices...", color = Muted, fontSize = 13.sp)
+            GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 24.dp,
+                borderColor = Accent.copy(alpha = 0.35f),
+                padding = 18.dp
+            ) {
+                Text("✦   Unlimited focus sessions every month", color = Fg, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(10.dp))
+                Text("✦   100% ad-free across Stats, Awards & Style", color = Fg, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(10.dp))
+                Text("✦   Full ambient study soundscapes & custom themes", color = Fg, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(10.dp))
+                Text("✦   Cancel any time in Google Play", color = Fg, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             }
+
+            if (billing.plans.isEmpty()) {
+                GlassCard(modifier = Modifier.fillMaxWidth(), cornerRadius = 20.dp, padding = 16.dp) {
+                    Text(
+                        "Connecting to Google Play Billing... (Plans: Monthly \$1.99 / Yearly \$14.99)",
+                        color = Muted,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
             billing.plans.forEach { p ->
                 val yearly = p.basePlanId == BillingManager.YEARLY
-                val label = if (yearly) "Yearly  ${p.price}  (best value)" else "Monthly  ${p.price}"
-                Link(label, color = if (yearly) Accent else Fg, size = 18) {
-                    ctx.findActivity()?.let { billing.buy(it, p) }
+                if (yearly) {
+                    PrimaryPillButton(
+                        text = "Yearly  •  ${p.price}/yr  (Best Value)",
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { ctx.findActivity()?.let { billing.buy(it, p) } }
+                    )
+                } else {
+                    SecondaryPillButton(
+                        text = "Monthly  •  ${p.price}/mo",
+                        modifier = Modifier.fillMaxWidth().height(54.dp),
+                        textColor = Fg,
+                        borderColor = Accent.copy(alpha = 0.45f),
+                        onClick = { ctx.findActivity()?.let { billing.buy(it, p) } }
+                    )
                 }
             }
 
             Text(
-                "Payment is charged to your Google Play account. The subscription renews automatically each month or year " +
-                    "until you cancel at least 24 hours before the renewal date. Manage or cancel in Google Play, " +
-                    "Payments & subscriptions.",
-                color = Muted, fontSize = 12.sp
+                "Payment is charged to your Google Play account. Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in Google Play → Payments & subscriptions.",
+                color = Muted,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
             )
-            Row {
-                Link("Restore purchase", size = 13) { billing.restore() }
-                Link("Manage subscription", size = 13) { ctx.openUrl(MANAGE_SUBS_URL) }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Link("Restore Purchase", color = Accent, size = 13) { billing.restore() }
+                Link("Manage Subscription", color = Muted, size = 13) { ctx.openUrl(MANAGE_SUBS_URL) }
+                Link("Privacy", color = Muted, size = 13) { ctx.openUrl(RemoteFlags.PRIVACY_URL) }
             }
-            Link("Privacy policy", size = 13) { ctx.openUrl(RemoteFlags.PRIVACY_URL) }
         }
-        Link(if (outOfMinutes) "Not now" else "Close", size = 16, onClick = onClose)
+        Spacer(Modifier.height(8.dp))
+        SecondaryPillButton(
+            text = if (outOfMinutes) "Maybe Later" else "Close",
+            onClick = onClose
+        )
     }
 }
