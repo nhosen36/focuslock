@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -25,15 +26,61 @@ import kotlin.random.Random
 
 /**
  * System-level full-screen lock overlay (TYPE_APPLICATION_OVERLAY).
- * Stays on top even if the user presses the Home button once, twice, or opens Recents,
+ * Stays on top even if the user swipes the Home gesture twice or presses Recents,
  * and removes itself automatically the instant the session ends or the 5 math problems are solved.
  */
 object LockOverlay {
     private var rootView: View? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
     private var ticker: Runnable? = null
 
     val isShowing: Boolean get() = rootView != null
+
+    @Suppress("DEPRECATION")
+    private fun applyImmersiveFlags(v: View) {
+        try {
+            v.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_FULLSCREEN
+                )
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Re-asserts the overlay at the very top of WindowManager when OEM ROMs (like Honor MagicOS)
+     * try to hide floating windows during a Home swipe gesture.
+     */
+    fun reassertOnTop(context: Context) {
+        val appCtx = context.applicationContext
+        val wm = appCtx.getSystemService(WindowManager::class.java) ?: return
+        val v = rootView ?: return
+        val lp = layoutParams ?: return
+        val delays = longArrayOf(0L, 100L, 300L, 650L)
+        for (d in delays) {
+            handler.postDelayed({
+                if (rootView === v) {
+                    try {
+                        v.visibility = View.VISIBLE
+                        applyImmersiveFlags(v)
+                        try {
+                            wm.removeViewImmediate(v)
+                        } catch (_: Exception) {}
+                        wm.addView(v, lp)
+                        v.requestFocus()
+                    } catch (_: Exception) {
+                        try {
+                            wm.updateViewLayout(v, lp)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }, d)
+        }
+    }
 
     fun show(
         context: Context,
@@ -58,15 +105,41 @@ object LockOverlay {
 
         val root = object : FrameLayout(appCtx) {
             override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
-                if (event?.keyCode == KeyEvent.KEYCODE_BACK) {
+                if (event?.keyCode == KeyEvent.KEYCODE_BACK ||
+                    event?.keyCode == KeyEvent.KEYCODE_HOME ||
+                    event?.keyCode == KeyEvent.KEYCODE_APP_SWITCH
+                ) {
                     return true
                 }
                 return super.dispatchKeyEvent(event)
+            }
+
+            override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
+                super.onWindowFocusChanged(hasWindowFocus)
+                applyImmersiveFlags(this)
+            }
+
+            override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+                super.onLayout(changed, left, top, right, bottom)
+                if (Build.VERSION.SDK_INT >= 29 && right > left && bottom > top) {
+                    try {
+                        systemGestureExclusionRects = listOf(
+                            Rect(0, bottom - dp(120), right, bottom),
+                            Rect(0, 0, right, dp(80))
+                        )
+                    } catch (_: Exception) {}
+                }
             }
         }.apply {
             setBackgroundColor(bgInt)
             isFocusable = true
             isFocusableInTouchMode = true
+            applyImmersiveFlags(this)
+            @Suppress("DEPRECATION")
+            setOnSystemUiVisibilityChangeListener {
+                // Immediately re-hide the gesture/nav bar on the 1st swipe so a 2nd swipe cannot trigger Home.
+                handler.postDelayed({ applyImmersiveFlags(this) }, 30L)
+            }
         }
 
         // --- container 1: Timer Screen ---
@@ -366,11 +439,13 @@ object LockOverlay {
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         )
 
+        @Suppress("DEPRECATION")
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
                 WindowManager.LayoutParams.FLAG_FULLSCREEN or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
@@ -386,13 +461,15 @@ object LockOverlay {
         try {
             wm.addView(root, lp)
             rootView = root
+            layoutParams = lp
+            root.requestFocus()
         } catch (_: Exception) {
             return
         }
 
         val r = object : Runnable {
             override fun run() {
-                if (rootView == null) return
+                val curRoot = rootView ?: return
                 val remMs = store.endTimeMs - System.currentTimeMillis()
                 if (remMs <= 0L) {
                     hide(appCtx)
@@ -400,6 +477,7 @@ object LockOverlay {
                     return
                 }
                 store.enforceIfActive()
+                applyImmersiveFlags(curRoot)
                 val sec = (remMs / 1000L).coerceAtLeast(0L)
                 timerText.text = "%02d:%02d".format(sec / 60, sec % 60)
                 musicBtn.text = if (music.isPlaying) "❚❚" else "▶"
@@ -415,9 +493,10 @@ object LockOverlay {
         ticker = null
         val v = rootView ?: return
         rootView = null
+        layoutParams = null
         try {
             val wm = context.applicationContext.getSystemService(WindowManager::class.java)
-            wm?.removeView(v)
+            wm?.removeViewImmediate(v)
         } catch (_: Exception) {}
     }
 }

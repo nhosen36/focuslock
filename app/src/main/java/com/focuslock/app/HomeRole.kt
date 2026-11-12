@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -19,44 +20,63 @@ object HomeRole {
     private const val ALERT_NOTIF_ID = 9002
 
     /**
-     * Opens the system "Do Not Disturb access" list directly.
-     * Using ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS directly works reliably across
-     * Android 8–17 including Honor MagicOS 10, Samsung One UI, Xiaomi, and Pixel.
+     * Launches an intent directly on the current Activity (without FLAG_ACTIVITY_NEW_TASK)
+     * so if the system Settings app was already open in the background on another page,
+     * Android opens the target sub-screen directly instead of merely resuming the old Settings page.
+     */
+    private fun startSettingsIntent(ctx: Context, intent: Intent): Boolean {
+        val act = ctx.findActivity()
+        return try {
+            if (act != null) {
+                act.startActivity(intent)
+            } else {
+                ctx.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Opens the system "Do Not Disturb access" screen directly across Android 8–17
+     * (including Honor MagicOS, Huawei EMUI, Samsung One UI, Xiaomi HyperOS, Vivo, Oppo, Pixel).
      */
     fun openDndSettings(ctx: Context) {
-        try {
-            ctx.startActivity(
-                Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (_: Exception) {
-            try {
-                ctx.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (_: Exception) {}
+        val candidates = listOf(
+            Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS),
+            Intent().setComponent(
+                ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.Settings\$NotificationAccessSettingsActivity"
+                )
+            ),
+            Intent().setComponent(
+                ComponentName(
+                    "com.android.settings",
+                    "com.android.settings.Settings\$ZenAccessSettingsActivity"
+                )
+            ),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        for (i in candidates) {
+            if (startSettingsIntent(ctx, i)) return
         }
     }
 
     fun canDrawOverlays(ctx: Context): Boolean = Settings.canDrawOverlays(ctx)
 
     fun openOverlaySettings(ctx: Context) {
-        try {
-            ctx.startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:${ctx.packageName}")
-                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            return
-        } catch (_: Exception) {}
-        try {
-            ctx.startActivity(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (_: Exception) {
-            try {
-                ctx.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            } catch (_: Exception) {}
+        val candidates = listOf(
+            Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${ctx.packageName}")
+            ),
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        for (i in candidates) {
+            if (startSettingsIntent(ctx, i)) return
         }
     }
 

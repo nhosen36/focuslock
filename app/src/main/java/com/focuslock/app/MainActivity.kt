@@ -89,6 +89,35 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        reassertLockIfActive()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        reassertLockIfActive()
+    }
+
+    private fun reassertLockIfActive() {
+        if (::store.isInitialized && store.isActive && !isChangingConfigurations) {
+            LockOverlay.reassertOnTop(applicationContext)
+            if (HomeRole.canDrawOverlays(this)) {
+                // Apps with SYSTEM_ALERT_WINDOW are permitted by Android to bring their activity back to front.
+                val i = Intent(this, MainActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+                }
+                try {
+                    startActivity(i)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     fun setImmersiveSessionMode(active: Boolean) {
         try {
             if (active) {
